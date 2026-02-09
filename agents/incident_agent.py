@@ -1,7 +1,7 @@
 import json
 from typing import Optional
 from state import IncidentState
-from tools.llm_client import get_llm
+from tools.common_functions import get_llm, parse_json
 
 llm = get_llm()
 
@@ -54,33 +54,6 @@ Return ONLY valid JSON in the following format:
 }}
 """
 
-
-# -----------------------------
-# Utility functions
-# -----------------------------
-
-def safe_json_loads(text: Optional[str]):
-    """
-    Safely parse JSON.
-    Returns None if parsing fails.
-    """
-    if text is None:
-        return None
-
-    if not isinstance(text, str):
-        return None
-
-    text = text.strip()
-
-    if not text:
-        return None
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
 def normalize_incident_type(value: Optional[str]) -> str:
     """
     Ensures incident_type is valid.
@@ -119,20 +92,18 @@ def classify_incident(state: IncidentState) -> IncidentState:
     # print("Prompt sent to LLM:")
     # print(prompt)
  
-    print("Raw LLM response:")
-    print(response)
+    # print("Raw LLM response:")
+    # print(response)
+    
     if hasattr(response, "content"):
         response_text = response.content
     else:
         response_text = str(response)
 
-    print("LLM response text:")
-    print(response_text)
+    parsed = parse_json(response_text)
 
-    parsed = safe_json_loads(response_text)
-
-    print("Parsed JSON:")
-    print(parsed)
+    # print("Parsed JSON:")
+    # print(parsed)
 
     incident_type = normalize_incident_type(
         parsed.get("incident_type") if parsed else None
@@ -149,6 +120,6 @@ def classify_incident(state: IncidentState) -> IncidentState:
     state["explanation"] = reason
     state["confidence"] = confidence
 
-    # print(f"Incident classified as: {incident_type} (confidence={confidence})")
+    print(f"Incident classified as: {incident_type} (confidence={confidence})")
 
     return state

@@ -1,10 +1,15 @@
-from typing import TypedDict, Optional, List
+from typing import TypedDict, Optional, List, Dict
 
-class IncidentState(TypedDict):
-    incident_id: str
+
+class IncidentState(TypedDict, total=False):
     description: str
-    incident_type: Optional[str]
-    suspected_root_cause: Optional[str]
-    confidence: Optional[float]
-    next_action: Optional[str]
-    history: List[str]
+
+    # Classification
+    incident_type: str
+    confidence: str
+    explanation: str
+
+    # RCA
+    root_causes: List[Dict[str, str]]
+    recommended_action: str
+    rca_reason: str
