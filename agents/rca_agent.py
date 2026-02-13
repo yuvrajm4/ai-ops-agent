@@ -46,6 +46,7 @@ Required format:
 # -----------------------------
 
 def analyze_root_cause(state: IncidentState) -> IncidentState:
+    print("\nPERFORMING RCA")
     description = state.get("description", "")
     incident_type = state.get("incident_type", "unknown")
     incident_id = state.get("incident_id", "")
@@ -91,10 +92,11 @@ def analyze_root_cause(state: IncidentState) -> IncidentState:
     state["recommended_action"] = recommended_action
     state["rca_reason"] = parsed.get("reason", "")
 
-    print(f"\n Recommended action: {state['recommended_action']}")
-
     #  MEMORY WRITE — THIS IS AUTO-LEARNING
     primary_root_cause = root_causes[0]["cause"] if root_causes else "Unknown"
+    
+    print(f"\nPrimary Root cause: {primary_root_cause}")
+    print(f"\nRecommended action: {state['recommended_action']}")
 
     store.add_incident(
         incident_id=incident_id,
@@ -104,6 +106,6 @@ def analyze_root_cause(state: IncidentState) -> IncidentState:
     )
 
     print(f"Learned from incident: {incident_type}")
-    print(f"Root cause stored: {primary_root_cause}")
+    print(f"Root cause stored in Vector DB")
 
     return state

@@ -88,7 +88,7 @@ def classify_incident(state: IncidentState) -> IncidentState:
     - Calls LLM
     - Safely parses and validates output
     """
-
+    print("\nCLASSIFYING INCIDENT")
     description = state.get("description", "")
 
     similar_incidents = store.search_similar(description, k=3)
