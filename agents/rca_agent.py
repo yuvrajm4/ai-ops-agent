@@ -1,6 +1,9 @@
 from typing import List
 from state import IncidentState
-from tools.common_functions import get_llm, parse_json
+from tools.common_functions import get_llm, parse_json, get_embeddings
+from memory.vector_store import IncidentVectorStore
+
+store = IncidentVectorStore()
 
 llm = get_llm()
 
@@ -14,7 +17,10 @@ Incident description:
 
 Incident type: {incident_type}
 
-Given this incident, identify the most likely root causes.
+Similar historical incidents:
+{similar_incidents}
+
+Given this incident AND historical patterns, identify the most likely root causes.
 
 IMPORTANT:
 - Do NOT use markdown
@@ -42,10 +48,19 @@ Required format:
 def analyze_root_cause(state: IncidentState) -> IncidentState:
     description = state.get("description", "")
     incident_type = state.get("incident_type", "unknown")
+    incident_id = state.get("incident_id", "")
+
+    similar_incidents = store.search_similar(description)
+
+    memory_context = "\n\n".join(
+        f"- {item['content']}"
+        for item in similar_incidents
+    )
 
     prompt = RCA_PROMPT.format(
-        description=description,
-        incident_type=incident_type
+    description=description,
+    incident_type=incident_type,
+    similar_incidents=memory_context or "No similar incidents found"
     )
 
     # print("\n RCA Prompt:")
@@ -69,10 +84,26 @@ def analyze_root_cause(state: IncidentState) -> IncidentState:
         state["rca_reason"] = "Unable to determine root cause"
         return state
 
-    state["root_causes"] = parsed.get("root_causes", [])
-    state["recommended_action"] = parsed.get("recommended_action", "escalate")
+    root_causes = parsed.get("root_causes", [])
+    recommended_action = parsed.get("recommended_action", "escalate")
+
+    state["root_causes"] = root_causes
+    state["recommended_action"] = recommended_action
     state["rca_reason"] = parsed.get("reason", "")
 
     print(f"\n Recommended action: {state['recommended_action']}")
+
+    #  MEMORY WRITE — THIS IS AUTO-LEARNING
+    primary_root_cause = root_causes[0]["cause"] if root_causes else "Unknown"
+
+    store.add_incident(
+        incident_id=incident_id,
+        description=description,
+        incident_type=incident_type,
+        root_cause=primary_root_cause
+    )
+
+    print(f"Learned from incident: {incident_type}")
+    print(f"Root cause stored: {primary_root_cause}")
 
     return state

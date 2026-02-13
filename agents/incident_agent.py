@@ -1,7 +1,10 @@
 import json
 from typing import Optional
 from state import IncidentState
-from tools.common_functions import get_llm, parse_json
+from tools.common_functions import get_llm, parse_json, get_embeddings
+from memory.vector_store import IncidentVectorStore
+
+store = IncidentVectorStore()
 
 llm = get_llm()
 
@@ -27,6 +30,11 @@ Incident description:
 \"\"\"
 {description}
 \"\"\"
+
+Historical similar incidents:
+{similar_incidents}
+
+Given this incident AND historical patterns, identify the most likely classification of the incident.
 
 Allowed incident types:
 - data_quality
@@ -83,9 +91,17 @@ def classify_incident(state: IncidentState) -> IncidentState:
 
     description = state.get("description", "")
 
+    similar_incidents = store.search_similar(description, k=3)
+
+    memory_context = "\n\n".join(
+        f"- {item['content']}"
+        for item in similar_incidents
+    )
+
     # ---- Build prompt safely ----
     prompt = CLASSIFICATION_PROMPT.format(
-        description=description
+        description=description,
+        similar_incidents=memory_context or "No similar incidents found"
     )
 
     response = llm.invoke(prompt)

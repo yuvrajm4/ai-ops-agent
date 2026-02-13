@@ -2,12 +2,19 @@ import json
 import re
 from typing import Optional, Dict, Any
 from langchain_community.llms import Ollama
+from langchain_community.embeddings import OllamaEmbeddings
 
 def get_llm():
     return Ollama(
         model="llama3",
         temperature=0.1
     )
+
+def get_embeddings():
+    return OllamaEmbeddings(
+        model="nomic-embed-text"
+    )
+
 
 def parse_json(text: Optional[str]):
     """
