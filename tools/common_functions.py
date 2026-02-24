@@ -42,8 +42,8 @@ ACCOUNT_ID = "70471823532973"
 API_TOKEN = "dbtu_ZlIRcR8BMwnf_DWsBUVtXKF19WPExLBe4bW3w6Dln9-is8XiY8"
 BASE_URL = "https://iy274.us1.dbt.com"
 
-def get_failed_dbt_runs(limit=5):
-    url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit=1"
+def get_failed_dbt_runs(limit=5, today_only=True):
+    url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit={limit}&status=20&order_by=-created_at"
 
     headers = {
         "Authorization": f"Token {API_TOKEN}",
@@ -61,7 +61,7 @@ def get_failed_dbt_runs(limit=5):
     return runs
 
 def get_run_artifact(run_id, artifact_name):
-    url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit=1"
+    url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit=10"
 
     url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/{run_id}/artifacts/{artifact_name}"
 

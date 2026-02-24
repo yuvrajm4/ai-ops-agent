@@ -114,8 +114,8 @@ def analyze_root_cause(state: IncidentState) -> IncidentState:
     similar_incidents = store.search_similar(description)
 
     memory_context = "\n\n".join(
-        f"- {item['content']}"
-        for item in similar_incidents
+    f"- {item.page_content}"
+    for item in similar_incidents
     )
 
     prompt = RCA_PROMPT.format(
