@@ -13,47 +13,44 @@ llm = get_llm()
 # -----------------------------
 
 ALLOWED_INCIDENT_TYPES = {
-    "data_quality",
-    "pipeline_failure",
-    "config_issue",
+    "transient_infra",
     "performance_issue",
     "dependency_issue",
+    "data_type_mismatch",
+    "logical_error",
+    "data_quality",
+    "config_issue",
+    "permission_issue",
+    "pipeline_failure",
     "unknown"
 }
 
 CLASSIFICATION_PROMPT = """
 You are an AI Ops incident classification agent.
 
-Classify the following incident related to dbt, Databricks, or data pipelines.
+Classify the following dbt/Databricks/data pipeline incident.
 
 Incident description:
 \"\"\"
 {description}
 \"\"\"
 
-Historical similar incidents:
+Similar historical incidents:
 {similar_incidents}
 
-Given this incident AND historical patterns, identify the most likely classification of the incident.
-
 Allowed incident types:
-- data_quality
-- pipeline_failure
-- config_issue
-- performance_issue
-- dependency_issue
+- transient_infra (timeouts, infra instability)
+- performance_issue (memory exceeded, resource limits)
+- dependency_issue (missing column, upstream model change)
+- data_type_mismatch (type incompatibility)
+- logical_error (incorrect join/filter logic)
+- data_quality (test failures: unique/not_null/etc)
+- config_issue (misconfiguration)
+- permission_issue (access denied)
+- pipeline_failure (orchestration failure)
 - unknown
 
-IMPORTANT:
-- Do NOT use markdown
-- Do NOT include explanations outside JSON
-- Do NOT wrap the response in ```json or ``` blocks
-- Output MUST be valid, parseable JSON
-- If unsure, return "incident_type": "unknown"
-
-Any response that is not valid JSON will be considered a failure.
-
-Return ONLY valid JSON in the following format:
+Return ONLY valid JSON:
 
 {{
   "incident_type": "<one of the allowed values>",
@@ -76,62 +73,76 @@ def normalize_incident_type(value: Optional[str]) -> str:
 
     return "unknown"
 
+def rule_based_classification(description: str) -> Optional[str]:
+    desc = description.lower()
+
+    # Retryable infra issues
+    if "memory" in desc or "exceeded" in desc:
+        return "performance_issue"
+
+    if "timeout" in desc or "network" in desc:
+        return "transient_infra"
+
+    # Code / PR issues
+    if "does not exist" in desc or "column" in desc:
+        return "dependency_issue"
+
+    if "invalid argument types" in desc or "cannot apply operator" in desc:
+        return "data_type_mismatch"
+
+    if "unique test failed" in desc or "not null test failed" in desc:
+        return "data_quality"
+
+    if "permission denied" in desc or "access denied" in desc:
+        return "permission_issue"
+
+    return None
 
 # -----------------------------
 # LangGraph Node
 # -----------------------------
 
 def classify_incident(state: IncidentState) -> IncidentState:
-    """
-    LangGraph node:
-    - Builds classification prompt
-    - Calls LLM
-    - Safely parses and validates output
-    """
     print("\nCLASSIFYING INCIDENT")
+
     description = state.get("description", "")
+    rule_type = rule_based_classification(description)
 
-    similar_incidents = store.search_similar(description, k=3)
+    # If deterministic rule found → skip LLM
+    if rule_type:
+        incident_type = rule_type
+        confidence = "high"
+        reason = "Rule-based classification matched known error pattern"
 
-    memory_context = "\n\n".join(
-        f"- {item['content']}"
-        for item in similar_incidents
-    )
-
-    # ---- Build prompt safely ----
-    prompt = CLASSIFICATION_PROMPT.format(
-        description=description,
-        similar_incidents=memory_context or "No similar incidents found"
-    )
-
-    response = llm.invoke(prompt)
-    # print("Prompt sent to LLM:")
-    # print(prompt)
- 
-    # print("Raw LLM response:")
-    # print(response)
-    
-    if hasattr(response, "content"):
-        response_text = response.content
     else:
-        response_text = str(response)
+        similar_incidents = store.search_similar(description, k=3)
 
-    parsed = parse_json(response_text)
+        memory_context = "\n\n".join(
+            f"- {getattr(item, 'page_content', str(item))}"
+            for item in similar_incidents
+        )
 
-    # print("Parsed JSON:")
-    # print(parsed)
+        prompt = CLASSIFICATION_PROMPT.format(
+            description=description,
+            similar_incidents=memory_context or "No similar incidents found"
+        )
 
-    incident_type = normalize_incident_type(
-        parsed.get("incident_type") if parsed else None
-    )
+        response = llm.invoke(prompt)
 
-    confidence = parsed.get("confidence", "low") if parsed else "low"
-    reason = parsed.get(
-        "reason",
-        "LLM response missing or invalid"
-    ) if parsed else "LLM response missing or invalid"
+        response_text = response.content if hasattr(response, "content") else str(response)
 
-    # ---- Update state ----
+        parsed = parse_json(response_text)
+
+        incident_type = normalize_incident_type(
+            parsed.get("incident_type") if parsed else None
+        )
+
+        confidence = parsed.get("confidence", "low") if parsed else "low"
+        reason = parsed.get(
+            "reason",
+            "LLM response missing or invalid"
+        ) if parsed else "LLM response missing or invalid"
+
     state["incident_type"] = incident_type
     state["explanation"] = reason
     state["confidence"] = confidence

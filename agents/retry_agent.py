@@ -121,7 +121,8 @@ def retry_agent_node(state: IncidentState) -> IncidentState:
     # Safe Limits
     # -----------------------------
 
-    max_attempts = min(max(int(parsed.get("max_attempts", 1)), 1), 3)
+    # max_attempts = min(max(int(parsed.get("max_attempts", 1)), 1), 1)
+    max_attempts = 1
     delay_seconds = min(max(int(parsed.get("delay_seconds", 10)), 5), 60)
 
     print(f"Executing retry: attempts={max_attempts}, delay={delay_seconds}s")

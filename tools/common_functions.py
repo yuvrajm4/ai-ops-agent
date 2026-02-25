@@ -42,7 +42,7 @@ ACCOUNT_ID = "70471823532973"
 API_TOKEN = "dbtu_ZlIRcR8BMwnf_DWsBUVtXKF19WPExLBe4bW3w6Dln9-is8XiY8"
 BASE_URL = "https://iy274.us1.dbt.com"
 
-def get_failed_dbt_runs(limit=5, today_only=True):
+def get_failed_dbt_runs(limit=1, today_only=True):
     url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit={limit}&status=20&order_by=-created_at"
 
     headers = {
@@ -61,7 +61,7 @@ def get_failed_dbt_runs(limit=5, today_only=True):
     return runs
 
 def get_run_artifact(run_id, artifact_name):
-    url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit=10"
+    url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/?limit=1"
 
     url = f"{BASE_URL}/api/v2/accounts/{ACCOUNT_ID}/runs/{run_id}/artifacts/{artifact_name}"
 
@@ -78,7 +78,7 @@ def get_run_artifact(run_id, artifact_name):
     return response.json()
 
 
-def retry_dbt_cloud_job(job_id: int, max_attempts: int = 2, delay_seconds: int = 15):
+def retry_dbt_cloud_job(job_id: int, max_attempts: int = 1, delay_seconds: int = 15):
     """
     Retries a dbt Cloud job multiple times.
     Returns final result.

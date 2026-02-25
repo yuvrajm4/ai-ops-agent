@@ -6,7 +6,7 @@ from tools.common_functions import get_failed_dbt_runs, get_run_artifact
 def extract_dbt_incidents() -> List[IncidentState]:
     incidents: List[IncidentState] = []
 
-    failed_runs = get_failed_dbt_runs(limit=10)
+    failed_runs = get_failed_dbt_runs(limit=1)
 
     for run in failed_runs:
         run_id = run.get("id")
@@ -26,14 +26,23 @@ def extract_dbt_incidents() -> List[IncidentState]:
             unique_id = result.get("unique_id")
             node = manifest.get("nodes", {}).get(unique_id, {})
 
+            status = result.get("status")
             error_message = result.get("message")
+
+            # Fallback for compile-time failures
+            if not error_message and status == "error":
+                error_message = run.get("error")
+
+            # Final fallback
+            if not error_message:
+                error_message = "Compile-time failure (no message in artifact)"
 
             state: IncidentState = {
                 "description": error_message,
                 "source": "dbt_cloud",
                 "job_id": job_id,              # REQUIRED FOR RETRY
                 "dbt_run_id": run_id,          # REQUIRED FOR ESCALATION
-                "incident_id": str(run_id),    # Useful for memory
+                "incident_id": f"{run_id}_{unique_id}",    # Useful for memory
                 "model_name": node.get("name"),
                 "unique_id": unique_id,
                 "file_path": node.get("original_file_path"),
@@ -47,5 +56,4 @@ def extract_dbt_incidents() -> List[IncidentState]:
             incidents.append(state)
 
     print(f"Extracted {len(incidents)} dbt incidents")
-
     return incidents
